@@ -1,0 +1,20 @@
+---
+title: "MDA 9159 - Statistical Modelling 1 - Fall 2024"
+author: "Group - Team Bits: Zhangju Xi, Pengwei Xu, Lingyu Zhao"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+urlcolor: blue
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r, include = FALSE}
+library(knitr)
+#opts_chunk$set(tidy.opts=list(width.cutoff=70),tidy=TRUE)
+```
+
+\newpage
