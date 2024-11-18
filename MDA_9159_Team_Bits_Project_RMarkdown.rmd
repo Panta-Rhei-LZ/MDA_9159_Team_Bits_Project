@@ -24,5 +24,7 @@ library(knitr)
 data = read.csv("https://raw.githubusercontent.com/Panta-Rhei-LZ/MDA_9159_Team_Bits_Project/refs/heads/main/Team_Bits_Data.csv")
 ```
 
-
+```{r}
+#asd
+```
 
