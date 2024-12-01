@@ -127,6 +127,35 @@ data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 ```
 
 
+```{r}
+# Replace NA with column median
+data = data.frame(lapply(data, function(column) {
+  column_median = median(column, na.rm = TRUE)
+  column[is.na(column)] = column_median
+  column
+}))
+```
+
+
+```{r}
+# Define box-cox and inverse box-cox transformation
+powerfun = function(y, lambda) {
+  if (lambda == 0) {
+    return(log(y))
+  } else {
+    return((y^lambda - 1) / lambda)
+  }
+}
+
+inv_powerfun = function(y_transformed, lambda) {
+  if (lambda == 0) {
+    return(exp(y_transformed))
+  } else {
+    return((lambda * y_transformed + 1)^(1/lambda))
+  }
+}
+```
+
 ### Data for Training and Validating
 
 ```{r}
