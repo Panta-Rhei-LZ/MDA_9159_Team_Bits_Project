@@ -131,6 +131,10 @@ data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 
 ```{r}
 set.seed(9159)
-clean_data = data[sample(nrow(data), 600),]
-```
 
+# Randomly sample 600 data entries for our project
+clean_data = data[sample(nrow(data), 600),]
+
+data_train = clean_data[1:500, ]  # First 500 rows for training
+data_valid = clean_data[501:600, ]  # Last 100 rows for validation
+```
