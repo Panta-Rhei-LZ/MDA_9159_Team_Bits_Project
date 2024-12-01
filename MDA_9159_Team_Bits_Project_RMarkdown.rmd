@@ -86,17 +86,16 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
 
 
 ### Preprocessing
-
-* Created dummy variables for categorical predictors:
-
-  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
-
 * Converted some predictors to numerical values:
 
   * AC: "Y" and "N" corresponds to "1" and "0".
   
   * SALEDATE: Transform calendar format values in SALEDATE to numerical values using as.Date().
   
+* Created dummy variables for categorical predictors:
+
+  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
+
 * Introduced a few new variables:
 
   * `SALE_YEAR`: The year that the house was sold, it is derived from `SALEDATE`.
@@ -112,16 +111,17 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
 library(lubridate)
 library(fastDummies)
 
+# Transform Yes/No for having AC to numerical values
+data$AC = ifelse(data$AC == 'Y', 1, 0)
+
 # Create dummy variables for categorical predictors
 data = dummy_cols(
   data, 
   select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
-                     "EXTWALL", "ROOF", "INTWALL"), 
-  remove_selected_columns = TRUE
+                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
+  remove_selected_columns = TRUE,
+  remove_first_dummy = TRUE
 )
-
-# Transform Yes/No for having AC to numerical values
-data$AC = ifelse(data$AC == 'Y', 1, 0)
 
 # Add SALEYEAR
 data$SALE_YEAR = year(ymd_hms(data$SALEDATE))
