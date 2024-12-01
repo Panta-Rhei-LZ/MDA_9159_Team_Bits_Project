@@ -126,6 +126,7 @@ data$SALE_RMDL_DIFF = data$SALE_YEAR - data$YR_RMDL
 data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 ```
 
+<<<<<<< HEAD
 
 ### Data for Training and Validating
 
@@ -134,4 +135,9 @@ set.seed(9159)
 clean_data = data[sample(nrow(data), 600),]
 ```
 
+=======
+```{r}
+#asd
+```
+>>>>>>> dc0589016709044b527c885be3ed0e8fc58f93e6
 
