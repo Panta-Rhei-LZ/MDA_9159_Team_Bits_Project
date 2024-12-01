@@ -87,25 +87,38 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
 
 ### Preprocessing
 
-* Converted categorical variables to numerical values:
+* Created dummy variables for categorical predictors:
 
-  1) AC: "Y" and "N" corresponds to "1" and "0".
+  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
+
+* Converted some predictors to numerical values:
+
+  * AC: "Y" and "N" corresponds to "1" and "0".
   
-  2) SALEDATE: Transform calendar format values in SALEDATE to numerical values using as.Date().
+  * SALEDATE: Transform calendar format values in SALEDATE to numerical values using as.Date().
   
 * Introduced a few new variables:
 
-  1) `SALE_YEAR`: The year that the house was sold, it is derived from `SALEDATE`.
+  * `SALE_YEAR`: The year that the house was sold, it is derived from `SALEDATE`.
   
-  2) `SALE_AYB_DIFF`: The difference between the year sold and the year built.
+  * `SALE_AYB_DIFF`: The difference between the year sold and the year built.
   
-  3) `SALE_EYB_DIFF`: The difference between the year sold and the year an improvement was applied.
+  * `SALE_EYB_DIFF`: The difference between the year sold and the year an improvement was applied.
 
-  4) `SALE_RMDL_DIFF`: The difference between the year sold and the year structure was remodeled.'
+  * `SALE_RMDL_DIFF`: The difference between the year sold and the year structure was remodeled.'
   
 
 ```{r}
 library(lubridate)
+library(fastDummies)
+
+# Create dummy variables for categorical predictors
+data = dummy_cols(
+  data, 
+  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
+                     "EXTWALL", "ROOF", "INTWALL"), 
+  remove_selected_columns = TRUE
+)
 
 # Transform Yes/No for having AC to numerical values
 data$AC = ifelse(data$AC == 'Y', 1, 0)
