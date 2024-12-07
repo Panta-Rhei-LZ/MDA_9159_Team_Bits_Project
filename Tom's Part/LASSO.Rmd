@@ -16,24 +16,29 @@ library(knitr)
 #opts_chunk$set(tidy.opts=list(width.cutoff=70),tidy=TRUE)
 ```
 
+```{r}
+# Clear environment
+rm(list = ls())
+```
+
 \newpage
 
-# Loading Date and Data Exploratory Analysis
+# Loading Data and Exploratory Data Analysis
 
 ```{r}
 library(dplyr)
 
 # Read in dataset
-data = read.csv("Team_Bits_Data.csv")
+data = read.csv("https://raw.githubusercontent.com/Panta-Rhei-LZ/MDA_9159_Team_Bits_Project/main/Team_Bits_Data.csv")
 
 # Remove price=0 entries
 data = data[data$PRICE != 0, ]
 
 # Remove rows with NA in all columns except 'YR_RMDL'
-data = data %>% filter(!if_any(-YR_RMDL, is.na))
+data = data %>% dplyr::filter(!if_any(-YR_RMDL, is.na))
 
 # Remove not useful columns
-data = data %>% select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
+data = data %>% dplyr::select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
                        -QUALIFIED, -SALE_NUM, -BLDG_NUM,
                        -STYLE_D, -STRUCT_D, -GRADE_D,
                        -CNDTN_D, -EXTWALL_D, -ROOF_D,
@@ -42,6 +47,7 @@ data = data %>% select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM,
 
 head(data)
 ```
+
 
 ## Variable Explanation
 
@@ -93,7 +99,7 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
   
 * Created dummy variables for categorical predictors:
 
-  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
+  * These categorical variables include: "AC", HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
 
 * Introduced a few new variables:
 
@@ -113,15 +119,6 @@ library(fastDummies)
 # Transform Yes/No for having AC to numerical values
 data$AC = ifelse(data$AC == 'Y', 1, 0)
 
-# Create dummy variables for categorical predictors
-data = dummy_cols(
-  data, 
-  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
-                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
-  remove_selected_columns = TRUE,
-  remove_first_dummy = TRUE
-)
-
 # Add SALEYEAR
 data$SALE_YEAR = year(ymd_hms(data$SALEDATE))
 
@@ -138,7 +135,6 @@ data$SALE_RMDL_DIFF = data$SALE_YEAR - data$YR_RMDL
 data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 ```
 
-
 ```{r}
 # Replace NA with column median
 data = data.frame(lapply(data, function(column) {
@@ -148,6 +144,23 @@ data = data.frame(lapply(data, function(column) {
 }))
 ```
 
+```{r}
+set.seed(9159)
+
+# Temporarily storing current data structure for plotting in later steps
+temp_data = data[sample(nrow(data), 600),]
+```
+
+```{r}
+# Create dummy variables for categorical predictors
+data = dummy_cols(
+  data, 
+  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
+                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
+  remove_selected_columns = TRUE,
+  remove_first_dummy = TRUE
+)
+```
 
 ```{r}
 # Define box-cox and inverse box-cox transformation
@@ -168,6 +181,7 @@ inv_powerfun = function(y_transformed, lambda) {
 }
 ```
 
+
 ## Data for Training and Validating
 
 ```{r}
@@ -180,7 +194,8 @@ data_train = clean_data[1:500, ]  # First 500 rows for training
 data_valid = clean_data[501:600, ]  # Last 100 rows for validation
 ```
 
-## Data Visualization
+
+## Response Variable Transformation
 
 ```{r}
 library(lmtest)
@@ -198,7 +213,13 @@ shapiro.test(clean_data$PRICE)
 ```
 
 ```{r}
-lambda = 0.0
+library(MASS)
+
+boxcox(lm(PRICE~., data=clean_data),lambda=seq(0,0.5,by=0.05))
+```
+
+```{r}
+lambda = 0.35
 ```
 
 ```{r}
@@ -216,8 +237,18 @@ shapiro.test(powerfun(clean_data$PRICE, lambda))
 trans_PRICE = powerfun(clean_data$PRICE, lambda)
 ```
 
+
+## Data Visualization
+
 ```{r}
-par(mfrow = c(2, 2))
+library(corrplot)
+
+cor_temp_data = cor(temp_data, use='complete.obs', method='pearson')
+corrplot(cor_temp_data, method='color', type='lower', tl.col='black', tl.cex=0.5)
+```
+
+```{r}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
 
 plot(clean_data$BATHRM, trans_PRICE,
      pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
@@ -241,7 +272,7 @@ plot(clean_data$BEDRM, trans_PRICE,
 ```
 
 ```{r}
-par(mfrow = c(2, 2))
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
 
 plot(clean_data$AYB, trans_PRICE,
      pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
@@ -265,7 +296,7 @@ plot(clean_data$SALEDATE, trans_PRICE,
 ```
 
 ```{r}
-par(mfrow = c(2, 2))
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
 
 plot(clean_data$KITCHENS, trans_PRICE,
      pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
@@ -289,7 +320,7 @@ plot(clean_data$AC, trans_PRICE,
 ```
 
 ```{r}
-par(mfrow = c(2, 2))
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
 
 plot(clean_data$SALE_YEAR, trans_PRICE,
      pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
@@ -313,7 +344,7 @@ plot(clean_data$SALE_RMDL_DIFF, trans_PRICE,
 ```
 
 ```{r}
-par(mfrow = c(1, 2))
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
 
 plot(clean_data$GBA, trans_PRICE,
      pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
@@ -328,7 +359,7 @@ plot(clean_data$LANDAREA, trans_PRICE,
 
 # Model Building and Analysis
 
-## Model Training
+## Model Training without Non-Linear Predictors
 ```{r}
 library(glmnet)
 
@@ -352,7 +383,27 @@ lasso_model = glmnet(X_train, y_train, alpha=1, lambda=best_lasso_lambda)
 predict(lasso_model, type="coefficients", s=best_lasso_lambda)
 ```
 
-## Compute Loss Metrics
+```{r}
+# Predicted values on training data
+pred_train = predict(lasso_model, newx=X_train, s=best_lasso_lambda)
+
+# Compute training SSE and SST
+SSE = sum((y_train - pred_train)^2)
+SST = sum((y_train - mean(y_train))^2)
+
+# R-squared
+R2 = 1 - SSE / SST
+
+# Adjusted R-squared
+n_train = length(y_train)
+p_train = sum(coef(lasso_model, s=best_lasso_lambda) != 0)
+Adjusted_R2 = 1 - (1 - R2) * (n_train) / (n_train - p_train)
+
+cat("R-squared:", R2, '\n')
+cat("Adjusted R-squared:", Adjusted_R2, '\n')
+```
+
+### Compute Loss Metrics
 
 ```{r}
 # Predicted values are transformed by powerfun(PRICE, lambda)
@@ -372,12 +423,81 @@ rmsle = sqrt(mean((log(data_valid$PRICE) - log(inv_valid_pred))^2))
 ```
 
 ```{r}
-cat("MSE:", mse, "\n")
-cat("RMSE:", rmse, "\n")
-cat("RMSLE:", rmsle, "\n")
+cat("MSE:", mse, '\n')
+cat("RMSE:", rmse, '\n')
+cat("RMSLE:", rmsle, '\n')
 ```
 
+## Model Training including Non-Linear Predictors
 
+```{r}
+X_train2 = model.matrix(
+  powerfun(PRICE, lambda)~. + poly(BATHRM, 4) + 
+    poly(HF_BATHRM, 3) + poly(BEDRM, 3) + poly(EYB, 2), 
+  data=data_train
+)[,-1]
+X_test2 = model.matrix(
+  powerfun(PRICE, lambda)~. + poly(BATHRM, 4) + 
+    poly(HF_BATHRM, 3) + poly(BEDRM, 3) + poly(EYB, 2), 
+  data=data_valid
+)[,-1]
+```
 
+```{r}
+cv_lasso2 = cv.glmnet(X_train2, y_train, alpha=1)
+best_lasso_lambda2 = cv_lasso2$lambda.min
+```
 
+```{r}
+lasso_model2 = glmnet(X_train2, y_train, alpha=1, lambda=best_lasso_lambda2)
+```
 
+```{r}
+# Check non-zero LASSO coefficients
+predict(lasso_model2, type="coefficients", s=best_lasso_lambda2)
+```
+
+```{r}
+# Predicted values on training data
+pred_train = predict(lasso_model2, newx=X_train2, s=best_lasso_lambda2)
+
+# Compute training SSE and SST
+SSE = sum((y_train - pred_train)^2)
+SST = sum((y_train - mean(y_train))^2)
+
+# R-squared
+R2 = 1 - SSE / SST
+
+# Adjusted R-squared
+n_train = length(y_train)
+p_train = sum(coef(lasso_model2, s=best_lasso_lambda2) != 0)
+Adjusted_R2 = 1 - (1 - R2) * (n_train) / (n_train - p_train)
+
+cat("R-squared:", R2, '\n')
+cat("Adjusted R-squared:", Adjusted_R2, '\n')
+```
+
+### Compute Loss Metrics
+
+```{r}
+# Predicted values are transformed by powerfun(PRICE, lambda)
+valid_pred = predict(lasso_model2, s=best_lasso_lambda2, newx=X_test2)
+
+# Using inv_powerfun to convert back to original scale
+inv_valid_pred = inv_powerfun(valid_pred, lambda)
+```
+
+### Compute MSE, RMSE and RMSLE
+
+```{r}
+# Compute metrics on validation dataset
+mse = mean((data_valid$PRICE - inv_valid_pred)^2)
+rmse = sqrt(mse)
+rmsle = sqrt(mean((log(data_valid$PRICE) - log(inv_valid_pred))^2))
+```
+
+```{r}
+cat("MSE:", mse, '\n')
+cat("RMSE:", rmse, '\n')
+cat("RMSLE:", rmsle, '\n')
+```
