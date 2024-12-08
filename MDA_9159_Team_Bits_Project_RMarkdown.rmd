@@ -142,6 +142,21 @@ data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 ```
 
 ```{r}
+# Replace NA with column median
+data_train = data.frame(lapply(data_train, function(column) {
+  column_median = median(column, na.rm = TRUE)
+  column[is.na(column)] = column_median
+  column
+}))
+
+data_test = data.frame(lapply(data_test, function(column) {
+  column_median = median(column, na.rm = TRUE)
+  column[is.na(column)] = column_median
+  column
+}))
+```
+
+```{r}
 # Define box-cox and inverse box-cox transformation
 powerfun = function(y, lambda) {
   if (lambda == 0) {
@@ -170,19 +185,4 @@ clean_data = data[sample(nrow(data), 600),]
 
 data_train = clean_data[1:500, ]  # First 500 rows for training
 data_valid = clean_data[501:600, ]  # Last 100 rows for validation
-```
-
-```{r}
-# Replace NA with column median
-data_train = data.frame(lapply(data_train, function(column) {
-  column_median = median(column, na.rm = TRUE)
-  column[is.na(column)] = column_median
-  column
-}))
-
-data_test = data.frame(lapply(data_test, function(column) {
-  column_median = median(column, na.rm = TRUE)
-  column[is.na(column)] = column_median
-  column
-}))
 ```
