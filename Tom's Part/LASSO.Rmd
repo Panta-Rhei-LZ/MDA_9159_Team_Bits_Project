@@ -17,14 +17,15 @@ library(knitr)
 #opts_chunk$set(tidy.opts=list(width.cutoff=70),tidy=TRUE)
 ```
 
-```{r}
-# Clear environment
-rm(list = ls())
-```
 
 \newpage
 
 # Loading Data and Exploratory Data Analysis
+
+```{r}
+# Clear environment
+rm(list = ls())
+```
 
 ```{r}
 library(dplyr)
@@ -227,7 +228,7 @@ lambda = 0.35
 # Plot histogram for log-transformed response variable `PRICE`
 hist(powerfun(clean_data$PRICE, lambda), col=adjustcolor('firebrick',alpha=0.6), 
      xlab='PRICE($)', ylab='Frequency',
-     main='Histogram of Log-Transformed PRICE')
+     main='Histogram of Transformed PRICE')
 ```
 
 ```{r}
