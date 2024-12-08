@@ -1,0 +1,504 @@
+---
+title: "LASSO"
+author: "Lingyu Zhao"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+urlcolor: blue
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+```{r, include = FALSE}
+library(knitr)
+#opts_chunk$set(tidy.opts=list(width.cutoff=70),tidy=TRUE)
+```
+
+```{r}
+# Clear environment
+rm(list = ls())
+```
+
+\newpage
+
+# Loading Data and Exploratory Data Analysis
+
+```{r}
+library(dplyr)
+
+# Read in dataset
+data = read.csv("https://raw.githubusercontent.com/Panta-Rhei-LZ/MDA_9159_Team_Bits_Project/main/Team_Bits_Data.csv")
+
+# Remove price=0 entries
+data = data[data$PRICE != 0, ]
+
+# Remove rows with NA in all columns except 'YR_RMDL'
+data = data %>% dplyr::filter(!if_any(-YR_RMDL, is.na))
+
+# Remove not useful columns
+data = data %>% dplyr::select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
+                       -QUALIFIED, -SALE_NUM, -BLDG_NUM,
+                       -STYLE_D, -STRUCT_D, -GRADE_D,
+                       -CNDTN_D, -EXTWALL_D, -ROOF_D,
+                       -INTWALL_D, -USECODE, -HEAT_D,
+                       -NUM_UNITS, -STRUCT)
+
+head(data)
+```
+
+
+## Variable Explanation
+
+We are dealing with housing data in this report, let me go over through the meanings behind each predictor:
+
+  1. PRICE: response
+  2. BATHRM: # bathrooms
+  3. HF_BATHRM: # half bathrooms
+  4. HEAT: heating
+  5. AC: air conditioning
+  6. ROOMS: # rooms
+  7. BEDRM: # bedrooms
+  8. AYB: The earliest time the main portion of the building was built
+  9. YR_RMDL: Year structure was remodelled
+  10. EYB: The year an improvement was built 
+  11. STORIES: # stories in primary dwelling
+  12. SALEDATE: Date of sale
+  13. GBA: Gross building area in square feet
+  14. STYLE: House style
+  15. GRADE: House grade
+  16. CNDTN: House condition
+  17. EXTWALL: Exterior wall tyle
+  18. ROOF: Roof type
+  19. INTWALL: Interior wall type
+  20. KITCHENS: # kitchens
+  21. FIREPLACES: # fireplaces
+  22. LANDAREA: Land area of property in square feet
+
+
+## NA Data
+
+Now let us explore the percentage of missing data for each predictor:
+
+```{r}
+missing_data = round(sapply(data, function(x) mean(is.na(x) * 100)), 3)
+
+missing_data
+```
+
+From the R output above, observe that "YR_RMDL: Year structure was remodeled" has around 36% missing data. A possible explanation for this could be: not all buildings were remodeled.
+
+
+## Preprocessing
+* Converted some predictors to numerical values:
+
+  * AC: "Y" and "N" corresponds to "1" and "0".
+  
+  * SALEDATE: Transform calendar format values in SALEDATE to numerical values using as.Date().
+  
+* Created dummy variables for categorical predictors:
+
+  * These categorical variables include: "AC", HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
+
+* Introduced a few new variables:
+
+  * `SALE_YEAR`: The year that the house was sold, it is derived from `SALEDATE`.
+  
+  * `SALE_AYB_DIFF`: The difference between the year sold and the year built.
+  
+  * `SALE_EYB_DIFF`: The difference between the year sold and the year an improvement was applied.
+
+  * `SALE_RMDL_DIFF`: The difference between the year sold and the year structure was remodeled.'
+  
+
+```{r}
+library(lubridate)
+library(fastDummies)
+
+# Transform Yes/No for having AC to numerical values
+data$AC = ifelse(data$AC == 'Y', 1, 0)
+
+# Add SALEYEAR
+data$SALE_YEAR = year(ymd_hms(data$SALEDATE))
+
+# Add SALEYEAR and AYB diff
+data$SALE_AYB_DIFF = data$SALE_YEAR - data$AYB
+
+# Add SALEYEAR and EYB diff
+data$SALE_EYB_DIFF = data$SALE_YEAR - data$EYB
+
+# Add SALEYEAR and YR_RMDL diff
+data$SALE_RMDL_DIFF = data$SALE_YEAR - data$YR_RMDL
+
+# Convert SALEDATE column to numeric values
+data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
+```
+
+```{r}
+# Replace NA with column median
+data = data.frame(lapply(data, function(column) {
+  column_median = median(column, na.rm = TRUE)
+  column[is.na(column)] = column_median
+  column
+}))
+```
+
+```{r}
+set.seed(9159)
+
+# Temporarily storing current data structure for plotting in later steps
+temp_data = data[sample(nrow(data), 600),]
+```
+
+```{r}
+# Create dummy variables for categorical predictors
+data = dummy_cols(
+  data, 
+  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
+                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
+  remove_selected_columns = TRUE,
+  remove_first_dummy = TRUE
+)
+```
+
+```{r}
+# Define box-cox and inverse box-cox transformation
+powerfun = function(y, lambda) {
+  if (lambda == 0) {
+    return(log(y))
+  } else {
+    return((y^lambda - 1) / lambda)
+  }
+}
+
+inv_powerfun = function(y_transformed, lambda) {
+  if (lambda == 0) {
+    return(exp(y_transformed))
+  } else {
+    return((lambda * y_transformed + 1)^(1/lambda))
+  }
+}
+```
+
+
+## Data for Training and Validating
+
+```{r}
+set.seed(9159)
+
+# Randomly sample 600 data entries for our project
+clean_data = data[sample(nrow(data), 600),]
+
+data_train = clean_data[1:500, ]  # First 500 rows for training
+data_valid = clean_data[501:600, ]  # Last 100 rows for validation
+```
+
+
+## Response Variable Transformation
+
+```{r}
+library(lmtest)
+```
+
+```{r}
+# Plot histogram for untransformed response variable `PRICE`
+hist(clean_data$PRICE, col=adjustcolor('firebrick',alpha=0.6),
+     xlab='PRICE($)', ylab='Frequency',
+     main='Histogram of Untransformed PRICE')
+```
+
+```{r}
+shapiro.test(clean_data$PRICE)
+```
+
+```{r}
+library(MASS)
+
+boxcox(lm(PRICE~., data=clean_data),lambda=seq(0,0.5,by=0.05))
+```
+
+```{r}
+lambda = 0.35
+```
+
+```{r}
+# Plot histogram for log-transformed response variable `PRICE`
+hist(powerfun(clean_data$PRICE, lambda), col=adjustcolor('firebrick',alpha=0.6), 
+     xlab='PRICE($)', ylab='Frequency',
+     main='Histogram of Log-Transformed PRICE')
+```
+
+```{r}
+shapiro.test(powerfun(clean_data$PRICE, lambda))
+```
+
+```{r}
+trans_PRICE = powerfun(clean_data$PRICE, lambda)
+```
+
+
+## Data Visualization
+
+```{r}
+library(corrplot)
+
+cor_temp_data = cor(temp_data, use='complete.obs', method='pearson')
+corrplot(cor_temp_data, method='color', type='lower', tl.col='black', tl.cex=0.5)
+```
+
+```{r}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+plot(clean_data$BATHRM, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "BATHRM", ylab = "trans_PRICE",
+     main = "BATHRM vs trans_PRICE")
+
+plot(clean_data$HF_BATHRM, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "HF_BATHRM", ylab = "trans_PRICE",
+     main = "HF_BATHRM vs trans_PRICE")
+
+plot(clean_data$ROOMS, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "ROOMS", ylab = "trans_PRICE",  
+     main = "ROOMS vs trans_PRICE")
+
+plot(clean_data$BEDRM, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "BEDRM", ylab = "trans_PRICE", 
+     main = "BEDRM vs trans_PRICE")
+```
+
+```{r}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+plot(clean_data$AYB, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "AYB", ylab = "trans_PRICE",
+     main = "AYB vs trans_PRICE")
+
+plot(clean_data$YR_RMDL, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "YR_RMDL", ylab = "trans_PRICE",
+     main = "YR_RMDL vs trans_PRICE")
+
+plot(clean_data$EYB, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "EYB", ylab = "trans_PRICE",  
+     main = "EYB vs trans_PRICE")
+
+plot(clean_data$SALEDATE, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "SALEDATE", ylab = "trans_PRICE", 
+     main = "SALEDATE vs trans_PRICE")
+```
+
+```{r}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+plot(clean_data$KITCHENS, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "KITCHENS", ylab = "trans_PRICE",
+     main = "KITCHENS vs trans_PRICE")
+
+plot(clean_data$FIREPLACES, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "FIREPLACES", ylab = "trans_PRICE",
+     main = "FIREPLACES vs trans_PRICE")
+
+plot(clean_data$STORIES, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "STORIES", ylab = "trans_PRICE",  
+     main = "STORIES vs trans_PRICE")
+
+plot(clean_data$AC, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "AC", ylab = "trans_PRICE", 
+     main = "AC vs trans_PRICE")
+```
+
+```{r}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+plot(clean_data$SALE_YEAR, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "SALE_YEAR", ylab = "trans_PRICE",
+     main = "SALE_YEAR vs trans_PRICE")
+
+plot(clean_data$SALE_AYB_DIFF, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "SALE_AYB_DIFF", ylab = "trans_PRICE",
+     main = "SALE_AYB_DIFF vs trans_PRICE")
+
+plot(clean_data$SALE_EYB_DIFF, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "SALE_EYB_DIFF", ylab = "trans_PRICE",  
+     main = "SALE_EYB_DIFF vs trans_PRICE")
+
+plot(clean_data$SALE_RMDL_DIFF, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "SALE_RMDL_DIFF", ylab = "trans_PRICE", 
+     main = "SALE_RMDL_DIFF vs trans_PRICE")
+```
+
+```{r}
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+
+plot(clean_data$GBA, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "GBA", ylab = "trans_PRICE",
+     main = "GBA vs trans_PRICE")
+
+plot(clean_data$LANDAREA, trans_PRICE,
+     pch = 19, col = adjustcolor('firebrick', alpha = 0.1), 
+     xlab = "LANDAREA", ylab = "trans_PRICE",
+     main = "LANDAREA vs trans_PRICE")
+```
+
+# Model Building and Analysis
+
+## Model Training without Non-Linear Predictors
+```{r}
+library(glmnet)
+
+X_train = model.matrix(powerfun(PRICE, lambda)~., data=data_train)[,-1]
+X_test = model.matrix(powerfun(PRICE, lambda)~., data=data_valid)[,-1]
+y_train = powerfun(data_train$PRICE, lambda)
+y_test = powerfun(data_valid$PRICE, lambda)
+```
+
+```{r}
+cv_lasso = cv.glmnet(X_train, y_train, alpha=1)
+best_lasso_lambda = cv_lasso$lambda.min
+```
+
+```{r}
+lasso_model = glmnet(X_train, y_train, alpha=1, lambda=best_lasso_lambda)
+```
+
+```{r}
+# Check non-zero LASSO coefficients
+predict(lasso_model, type="coefficients", s=best_lasso_lambda)
+```
+
+```{r}
+# Predicted values on training data
+pred_train = predict(lasso_model, newx=X_train, s=best_lasso_lambda)
+
+# Compute training SSE and SST
+SSE = sum((y_train - pred_train)^2)
+SST = sum((y_train - mean(y_train))^2)
+
+# R-squared
+R2 = 1 - SSE / SST
+
+# Adjusted R-squared
+n_train = length(y_train)
+p_train = sum(coef(lasso_model, s=best_lasso_lambda) != 0)
+Adjusted_R2 = 1 - (1 - R2) * (n_train) / (n_train - p_train)
+
+cat("R-squared:", R2, '\n')
+cat("Adjusted R-squared:", Adjusted_R2, '\n')
+```
+
+### Compute Loss Metrics
+
+```{r}
+# Predicted values are transformed by powerfun(PRICE, lambda)
+valid_pred = predict(lasso_model, s=best_lasso_lambda, newx=X_test)
+
+# Using inv_powerfun to convert back to original scale
+inv_valid_pred = inv_powerfun(valid_pred, lambda)
+```
+
+### Compute MSE, RMSE and RMSLE
+
+```{r}
+# Compute metrics on validation dataset
+mse = mean((data_valid$PRICE - inv_valid_pred)^2)
+rmse = sqrt(mse)
+rmsle = sqrt(mean((log(data_valid$PRICE) - log(inv_valid_pred))^2))
+```
+
+```{r}
+cat("MSE:", mse, '\n')
+cat("RMSE:", rmse, '\n')
+cat("RMSLE:", rmsle, '\n')
+```
+
+## Model Training including Non-Linear Predictors
+
+```{r}
+X_train2 = model.matrix(
+  powerfun(PRICE, lambda)~. + poly(BATHRM, 4) + 
+    poly(HF_BATHRM, 3) + poly(BEDRM, 3) + poly(EYB, 2), 
+  data=data_train
+)[,-1]
+X_test2 = model.matrix(
+  powerfun(PRICE, lambda)~. + poly(BATHRM, 4) + 
+    poly(HF_BATHRM, 3) + poly(BEDRM, 3) + poly(EYB, 2), 
+  data=data_valid
+)[,-1]
+```
+
+```{r}
+cv_lasso2 = cv.glmnet(X_train2, y_train, alpha=1)
+best_lasso_lambda2 = cv_lasso2$lambda.min
+```
+
+```{r}
+lasso_model2 = glmnet(X_train2, y_train, alpha=1, lambda=best_lasso_lambda2)
+```
+
+```{r}
+# Check non-zero LASSO coefficients
+predict(lasso_model2, type="coefficients", s=best_lasso_lambda2)
+```
+
+```{r}
+# Predicted values on training data
+pred_train = predict(lasso_model2, newx=X_train2, s=best_lasso_lambda2)
+
+# Compute training SSE and SST
+SSE = sum((y_train - pred_train)^2)
+SST = sum((y_train - mean(y_train))^2)
+
+# R-squared
+R2 = 1 - SSE / SST
+
+# Adjusted R-squared
+n_train = length(y_train)
+p_train = sum(coef(lasso_model2, s=best_lasso_lambda2) != 0)
+Adjusted_R2 = 1 - (1 - R2) * (n_train) / (n_train - p_train)
+
+cat("R-squared:", R2, '\n')
+cat("Adjusted R-squared:", Adjusted_R2, '\n')
+```
+
+### Compute Loss Metrics
+
+```{r}
+# Predicted values are transformed by powerfun(PRICE, lambda)
+valid_pred = predict(lasso_model2, s=best_lasso_lambda2, newx=X_test2)
+
+# Using inv_powerfun to convert back to original scale
+inv_valid_pred = inv_powerfun(valid_pred, lambda)
+```
+
+### Compute MSE, RMSE and RMSLE
+
+```{r}
+# Compute metrics on validation dataset
+mse = mean((data_valid$PRICE - inv_valid_pred)^2)
+rmse = sqrt(mse)
+rmsle = sqrt(mean((log(data_valid$PRICE) - log(inv_valid_pred))^2))
+```
+
+```{r}
+cat("MSE:", mse, '\n')
+cat("RMSE:", rmse, '\n')
+cat("RMSLE:", rmsle, '\n')
+```
