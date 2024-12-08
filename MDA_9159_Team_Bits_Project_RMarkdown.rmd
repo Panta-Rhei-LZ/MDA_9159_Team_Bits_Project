@@ -143,13 +143,7 @@ data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 
 ```{r}
 # Replace NA with column median
-data_train = data.frame(lapply(data_train, function(column) {
-  column_median = median(column, na.rm = TRUE)
-  column[is.na(column)] = column_median
-  column
-}))
-
-data_test = data.frame(lapply(data_test, function(column) {
+data = data.frame(lapply(data, function(column) {
   column_median = median(column, na.rm = TRUE)
   column[is.na(column)] = column_median
   column
