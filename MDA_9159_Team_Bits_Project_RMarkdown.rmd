@@ -1,6 +1,6 @@
 ---
 title: "MDA 9159 - Statistical Modelling 1 - Fall 2024"
-author: "Group - Team Bits: Zhangju Xi, Pengwei Xu, Lingyu Zhao"
+author: "Group - Team Bits: Miles Xi, Pengwei Xu, Lingyu Zhao"
 output:
   pdf_document: default
   word_document: default
@@ -31,9 +31,11 @@ data = read.csv("Team_Bits_Data.csv")
 data = data[data$PRICE != 0, ]
 
 # Remove rows with NA in all columns except 'YR_RMDL'
+# will impute the missing values, if any, for this variable
 data = data %>% filter(!if_any(-YR_RMDL, is.na))
 
-# Remove not useful columns
+# Remove redundant columns 
+# as "_D" columns are merely descriptions of their corresponding columns
 data = data %>% select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
                        -QUALIFIED, -SALE_NUM, -BLDG_NUM,
                        -STYLE_D, -STRUCT_D, -GRADE_D,
@@ -46,7 +48,7 @@ head(data)
 
 ### Variable Explanation
 
-We are dealing with housing data in this report, let me go over through the meanings behind each predictor:
+We are dealing with housing data in this report, below is an explanation of variables:
 
   1. PRICE: response
   2. BATHRM: # bathrooms
@@ -82,7 +84,7 @@ missing_data = round(sapply(data, function(x) mean(is.na(x) * 100)), 3)
 missing_data
 ```
 
-From the R output above, observe that "YR_RMDL: Year structure was remodeled" has around 36% missing data. A possible explanation for this could be: not all buildings were remodeled.
+From the R output above, observe that "YR_RMDL: Year structure was remodeled" has around 36% missing data. A possible explanation for this is that not all buildings were remodeled.
 
 
 ### Preprocessing
@@ -94,7 +96,7 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
   
 * Created dummy variables for categorical predictors:
 
-  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
+  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF", "INTWALL", and "AC".
 
 * Introduced a few new variables:
 
@@ -139,7 +141,6 @@ data$SALE_RMDL_DIFF = data$SALE_YEAR - data$YR_RMDL
 data$SALEDATE = as.numeric(as.Date(data$SALEDATE))
 ```
 
-
 ```{r}
 # Replace NA with column median
 data = data.frame(lapply(data, function(column) {
@@ -148,7 +149,6 @@ data = data.frame(lapply(data, function(column) {
   column
 }))
 ```
-
 
 ```{r}
 # Define box-cox and inverse box-cox transformation
