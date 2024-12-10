@@ -33,6 +33,8 @@ library(dplyr)
 # Read in dataset
 data = read.csv("https://raw.githubusercontent.com/Panta-Rhei-LZ/MDA_9159_Team_Bits_Project/main/Team_Bits_Data.csv")
 
+# May need to rerun this chunk a few times to fully load data due to unstable internet connection
+
 # Remove price=0 entries
 data = data[data$PRICE != 0, ]
 
@@ -386,6 +388,10 @@ predict(lasso_model, type="coefficients", s=best_lasso_lambda)
 ```
 
 ```{r}
+cat("Number of non-zero coefficients including the intercept:", sum(predict(lasso_model, type="coefficients", s=best_lasso_lambda) != 0), "\n")
+```
+
+```{r}
 # Predicted values on training data
 pred_train = predict(lasso_model, newx=X_train, s=best_lasso_lambda)
 
@@ -457,6 +463,10 @@ lasso_model2 = glmnet(X_train2, y_train, alpha=1, lambda=best_lasso_lambda2)
 ```{r}
 # Check non-zero LASSO coefficients
 predict(lasso_model2, type="coefficients", s=best_lasso_lambda2)
+```
+
+```{r}
+cat("Number of non-zero coefficients including the intercept:", sum(predict(lasso_model2, type="coefficients", s=best_lasso_lambda2) != 0), "\n")
 ```
 
 ```{r}

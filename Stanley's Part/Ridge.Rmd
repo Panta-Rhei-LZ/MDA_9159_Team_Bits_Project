@@ -16,24 +16,29 @@ library(knitr)
 
 \newpage
 
-# Loading Date and Data Exploratory Analysis
+# Loading Data and Exploratory Data Analysis
+
+```{r}
+# Clear environment
+rm(list = ls())
+```
 
 ```{r}
 library(dplyr)
 
 # Read in dataset
-data = read.csv("C:\\Users\\stanl\\Downloads\\Team_Bits_Data.csv")
+data = read.csv("https://raw.githubusercontent.com/Panta-Rhei-LZ/MDA_9159_Team_Bits_Project/main/Team_Bits_Data.csv")
+
+# May need to rerun this chunk a few times to fully load data due to unstable internet connection
 
 # Remove price=0 entries
 data = data[data$PRICE != 0, ]
 
 # Remove rows with NA in all columns except 'YR_RMDL'
-# will impute the missing values, if any, for this variable
-data = data %>% filter(!if_any(-YR_RMDL, is.na))
+data = data %>% dplyr::filter(!if_any(-YR_RMDL, is.na))
 
-# Remove redundant columns 
-# as "_D" columns are merely descriptions of their corresponding columns
-data = data %>% select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
+# Remove not useful columns
+data = data %>% dplyr::select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM, 
                        -QUALIFIED, -SALE_NUM, -BLDG_NUM,
                        -STYLE_D, -STRUCT_D, -GRADE_D,
                        -CNDTN_D, -EXTWALL_D, -ROOF_D,
@@ -43,9 +48,10 @@ data = data %>% select(-SSL, -OBJECTID, -GIS_LAST_MOD_DTTM,
 head(data)
 ```
 
-### Variable Explanation
 
-We are dealing with housing data in this report, below is an explanation of variables:
+## Variable Explanation
+
+We are dealing with housing data in this report, let me go over through the meanings behind each predictor:
 
   1. PRICE: response
   2. BATHRM: # bathrooms
@@ -71,7 +77,7 @@ We are dealing with housing data in this report, below is an explanation of vari
   22. LANDAREA: Land area of property in square feet
 
 
-### NA Data
+## NA Data
 
 Now let us explore the percentage of missing data for each predictor:
 
@@ -81,10 +87,10 @@ missing_data = round(sapply(data, function(x) mean(is.na(x) * 100)), 3)
 missing_data
 ```
 
-From the R output above, observe that "YR_RMDL: Year structure was remodeled" has around 36% missing data. A possible explanation for this is that not all buildings were remodeled.
+From the R output above, observe that "YR_RMDL: Year structure was remodeled" has around 36% missing data. A possible explanation for this could be: not all buildings were remodeled.
 
 
-### Preprocessing
+## Preprocessing
 * Converted some predictors to numerical values:
 
   * AC: "Y" and "N" corresponds to "1" and "0".
@@ -93,7 +99,7 @@ From the R output above, observe that "YR_RMDL: Year structure was remodeled" ha
   
 * Created dummy variables for categorical predictors:
 
-  * These categorical variables include: "HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF", "INTWALL", and "AC".
+  * These categorical variables include: "AC", HEAT", "STYLE", "GRADE", "CNDTN", "EXTWALL", "ROOF" and "INTWALL".
 
 * Introduced a few new variables:
 
@@ -112,15 +118,6 @@ library(fastDummies)
 
 # Transform Yes/No for having AC to numerical values
 data$AC = ifelse(data$AC == 'Y', 1, 0)
-
-# Create dummy variables for categorical predictors
-data = dummy_cols(
-  data, 
-  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
-                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
-  remove_selected_columns = TRUE,
-  remove_first_dummy = TRUE
-)
 
 # Add SALEYEAR
 data$SALE_YEAR = year(ymd_hms(data$SALEDATE))
@@ -148,6 +145,24 @@ data = data.frame(lapply(data, function(column) {
 ```
 
 ```{r}
+set.seed(9159)
+
+# Temporarily storing current data structure for plotting in later steps
+temp_data = data[sample(nrow(data), 600),]
+```
+
+```{r}
+# Create dummy variables for categorical predictors
+data = dummy_cols(
+  data, 
+  select_columns = c("HEAT", "STYLE", "GRADE", "CNDTN", 
+                     "EXTWALL", "ROOF", "INTWALL", "AC"), 
+  remove_selected_columns = TRUE,
+  remove_first_dummy = TRUE
+)
+```
+
+```{r}
 # Define box-cox and inverse box-cox transformation
 powerfun = function(y, lambda) {
   if (lambda == 0) {
@@ -166,7 +181,8 @@ inv_powerfun = function(y_transformed, lambda) {
 }
 ```
 
-### Data for Training and Validating
+
+## Data for Training and Validating
 
 ```{r}
 set.seed(9159)
@@ -177,6 +193,7 @@ clean_data = data[sample(nrow(data), 600),]
 data_train = clean_data[1:500, ]  # First 500 rows for training
 data_valid = clean_data[501:600, ]  # Last 100 rows for validation
 ```
+
 
 ## Response Variable Transformation
 
